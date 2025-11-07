@@ -2,10 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'newproject_screen.dart';
-import 'project_screen.dart';
-import 'form_screen.dart';
-import 'response_screen.dart';
-import 'draft_screen.dart';
 import 'newform_screen.dart';
 import 'login_screen.dart';
 import '../widgets/wifi_status_icon.dart';
@@ -29,10 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
         'label': 'Total Projects',
         'count': 0,
         'onclick': () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const ProjectScreen()),
-          );
+          Navigator.pushNamed(context, '/project');
         }
       },
       {
@@ -40,10 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
         'label': 'Total Forms',
         'count': 0,
         'onclick': () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const FormScreen()),
-          );
+          Navigator.pushNamed(context, '/form');
         }
       },
       {
@@ -51,10 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
         'label': 'Total Responses',
         'count': 0,
         'onclick': () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const ResponseScreen()),
-          );
+          Navigator.pushNamed(context, '/res');
         }
       },
       {
@@ -62,10 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
         'label': 'Drafts',
         'count': 0,
         'onclick': () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const DraftScreen()),
-          );
+          Navigator.pushNamed(context, '/draft');
         }
       },
     ];
@@ -95,21 +79,14 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Icon(Icons.description),
             label: 'Create Form',
             onTap: () {
-              Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const NewFormScreen()));
+              Navigator.pushNamed(context, '/new-form');
             },
           ),
           SpeedDialChild(
             child: Icon(Icons.work),
             label: 'Create Project',
             onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const NewProjectScreen()),
-              );
+              Navigator.pushNamed(context, '/new-project');
             },
           ),
         ],

@@ -32,4 +32,26 @@ class UserRepository {
       whereArgs: [userId],
     );
   }
+
+  Future<User?> getUserById(int userId) async {
+    final result = await _dbHelper.query(
+      'User',
+      where: 'UserId = ?',
+      whereArgs: [userId],
+    );
+    if (result.isNotEmpty) {
+      return User.fromMap(result.first);
+    }
+    return null;
+  }
+
+  Future<int> updateUser(User user) async {
+    return await _dbHelper.update(
+      'User',
+      user.toMap(),
+      where: 'UserId = ?',
+      whereArgs: [user.userId],
+    );
+  }
+  
 }

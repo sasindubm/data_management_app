@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'utils/theme.dart';
-import 'screens/login_screen.dart';
-// import 'screens/home_screen.dart';
+import 'routes/app_routes.dart';
 
 void main() {
   runApp(const MainApp());
@@ -16,8 +15,8 @@ class MainApp extends StatelessWidget {
       title: 'CivicData Core',
       theme: governmentTheme,
       debugShowCheckedModeBanner: false,
-      home: LoginScreen(),
-      // home: HomeScreen(),
+      initialRoute: '/',
+      routes: AppRoutes().appRoutes,
     );
   }
 }

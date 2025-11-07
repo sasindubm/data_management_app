@@ -15,4 +15,35 @@ class AuthService {
 
     return userId > 0 ? null : 'Failed to create account.';
   }
+
+  Future<User?> loginUser(String username, String password) async {
+    final user = await _userRepo.getUserByUsername(username);
+    if (user == null) return null;
+
+    final hashedPassword = CryptoHelper.hashPassword(password);
+    if (user.password == hashedPassword) {
+      return user;
+    }
+    return null;
+  }
+
+  Future<bool> changePassword(int userId, String oldPassword, String newPassword) async {
+    final user = await _userRepo.getUserById(userId);
+    if (user == null) return false;
+
+    final hashedOldPassword = CryptoHelper.hashPassword(oldPassword);
+    if (user.password != hashedOldPassword) return false;
+
+    final hashedNewPassword = CryptoHelper.hashPassword(newPassword);
+    final updatedUser = User(
+      userId: user.userId,
+      username: user.username,
+      password: hashedNewPassword,
+    );
+
+    final rowsAffected = await _userRepo.updateUser(updatedUser);
+    return rowsAffected > 0;
+  }
+
+
 }

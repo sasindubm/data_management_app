@@ -1,4 +1,4 @@
-import 'package:data_management_app/screens/home_screen.dart';
+import 'home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'signup_screen.dart';
@@ -113,10 +113,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: () {
-                      Navigator.push(
+                      Navigator.pushNamed(
                         context,
-                        MaterialPageRoute(
-                            builder: (context) => SignupScreen()),
+                        '/reg'
                       );
                     },
                     child: Text(
@@ -130,10 +129,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 TextButton(
                   onPressed: () {
-                    Navigator.push(
+                    Navigator.pushNamed(
                       context,
-                      MaterialPageRoute(
-                          builder: (context) => SignupScreen()),
+                      '/reg'
                     );
                   },
                   child: Text(

@@ -15,7 +15,7 @@ class DatabaseHelper {
   }
 
   Future<Database> _initDatabase() async {
-    String path = join(await getDatabasesPath(), 'user_database.db');
+    String path = join(await getDatabasesPath(), 'civic_app.db');
 
     return await openDatabase(
       path,
@@ -25,94 +25,129 @@ class DatabaseHelper {
   }
 
   Future<void> _createDatabase(Database db, int version) async {
-    await db.execute('''
+    final batch = db.batch();
+
+    batch.execute('''
       CREATE TABLE User (
         UserId INTEGER PRIMARY KEY AUTOINCREMENT,
         Username TEXT UNIQUE NOT NULL,
         Password TEXT NOT NULL
-      )
-    ''');
+      )''');
 
-    await db.execute('''
+    batch.execute('''
       CREATE TABLE Response (
-        ResponseID INTEGER PRIMARY KEY AUTOINCREMENT,
+        ResponseId INTEGER PRIMARY KEY AUTOINCREMENT,
         FormId INTEGER,
-        UserID INTEGER,
-        ResponseStatus VARCHAR(50)
-      )
-    ''');
+        UserId INTEGER,
+        ResponseStatus TEXT,
+        FOREIGN KEY (FormId) REFERENCES Form(FormId),
+        FOREIGN KEY (UserId) REFERENCES User(UserId)
+      )''');
 
-    await db.execute('''
+    batch.execute('''
       CREATE TABLE Question (
-        QuestionID INTEGER PRIMARY KEY AUTOINCREMENT,
-        QuestionText VARCHAR(50),
-        QuestionType VARCHAR(50),
-        FormId INTEGER
-      )
-    ''');
+        QuestionId INTEGER PRIMARY KEY AUTOINCREMENT,
+        QuestionText TEXT NOT NULL,
+        QuestionType TEXT,
+        FormId INTEGER,
+        FOREIGN KEY (FormId) REFERENCES Form(FormId)
+      )''');
 
-    await db.execute('''
+    batch.execute('''
       CREATE TABLE Answer (
-        AnswerID INTEGER PRIMARY KEY AUTOINCREMENT,
-        AnswerText VARCHAR(50),
-        QuestionID INTEGER,
-        ResponseID INTEGER
-      )
-    ''');
+        AnswerId INTEGER PRIMARY KEY AUTOINCREMENT,
+        AnswerText TEXT,
+        QuestionId INTEGER,
+        ResponseId INTEGER,
+        FOREIGN KEY (QuestionId) REFERENCES Question(QuestionId),
+        FOREIGN KEY (ResponseId) REFERENCES Response(ResponseId)
+      )''');
 
-    await db.execute('''
+    batch.execute('''
       CREATE TABLE Media (
         MediaId INTEGER PRIMARY KEY AUTOINCREMENT,
-        AnswerID INTEGER,
-        MediaName VARCHAR(50),
-        MediaType VARCHAR(50),
-        Extension VARCHAR(50),
-        Location TEXT
-      )
-    ''');
+        MediaName TEXT,
+        MediaType TEXT,
+        Extension TEXT,
+        Location TEXT,
+        AnswerId INTEGER,
+        FOREIGN KEY (AnswerId) REFERENCES Answer(AnswerId)
+      )''');
 
-    await db.execute('''
+    batch.execute('''
       CREATE TABLE Choice (
         ChoiceId INTEGER PRIMARY KEY AUTOINCREMENT,
-        ChoiceText VARCHAR(50)
-      )
-    ''');
+        ChoiceText TEXT,
+        QuestionId INTEGER,
+        FOREIGN KEY (QuestionId) REFERENCES Question(QuestionId)
+      )''');
 
-    await db.execute('''
-      CREATE TABLE Form (
+    batch.execute('''
+      Form (
         FormId INTEGER PRIMARY KEY AUTOINCREMENT,
-        ProjectId INTEGER
-      )
-    ''');
+        ProjectId INTEGER,
+        FOREIGN KEY (ProjectId) REFERENCES Project(ProjectId)
+      )''');
 
-    await db.execute('''
+    batch.execute('''
       CREATE TABLE Project (
         ProjectId INTEGER PRIMARY KEY AUTOINCREMENT,
-        ProjectName VARCHAR(50),
-        StartedDate VARCHAR(50),
-        ProjectTitle VARCHAR(50),
-        ProjectDescription VARCHAR(50),
-        ProjectStatus VARCHAR(50),
+        ProjectName TEXT NOT NULL,
+        ProjectTitle TEXT,
+        ProjectDescription TEXT,
+        ProjectStatus TEXT,
         SectorId INTEGER,
         UserId INTEGER,
-        FinishedDate DATE
-      )
+        StartDate DATE,
+        FinishedDate DATE,
+        FOREIGN KEY (SectorId) REFERENCES Sector(SectorId),
+        FOREIGN KEY (UserId) REFERENCES User(UserId)
+    )
     ''');
 
-    await db.execute('''
+    batch.execute('''
       CREATE TABLE Department (
         DepartmentId INTEGER PRIMARY KEY AUTOINCREMENT,
-        DepartmentName VARCHAR(50)
+        DepartmentName TEXT NOT NULL
+    )
+    ''');
+
+    batch.execute('''
+      CREATE TABLE Sector (
+        SectorId INTEGER PRIMARY KEY AUTOINCREMENT,
+        DepartmentId INTEGER,
+        SectorName TEXT NOT NULL,
+        FOREIGN KEY (DepartmentId) REFERENCES Department(DepartmentId)
+    )
+    ''');
+
+    batch.execute('''
+      CREATE TABLE ProjectAssignment (
+        ProjectAssignmentId INTEGER PRIMARY KEY AUTOINCREMENT,
+        ProjectId INTEGER,
+        UserId INTEGER
       )
     ''');
 
-    await db.execute('''
-      CREATE TABLE Sector (
-        SectorID INTEGER PRIMARY KEY AUTOINCREMENT,
-        DepartmentId INTEGER,
-        SectorName VARCHAR(50)
-      )
-    ''');
+    batch.execute('''
+      CREATE TABLE AnswerChoice (
+          AnswerId INTEGER,
+          ChoiceId INTEGER,
+          PRIMARY KEY (AnswerId, ChoiceId),
+          FOREIGN KEY (AnswerId) REFERENCES Answer(AnswerId),
+          FOREIGN KEY (ChoiceId) REFERENCES Choice(ChoiceId)
+      )''');
+
+    batch.execute('''
+      CREATE TABLE UserCreatesProject (
+          UCPId INTEGER PRIMARY KEY,
+          UserId INTEGER,
+          ProjectId INTEGER,
+          FOREIGN KEY (UserId) REFERENCES User(UserId),
+          FOREIGN KEY (ProjectId) REFERENCES Project(ProjectId)
+      )''');
+
+    await batch.commit();
   }
 
   Future<int> insert(String table, Map<String, dynamic> values) async {

@@ -34,6 +34,7 @@ class ResponseCollectionScreenState extends State<ResponseCollectionScreen> {
     _selectedMultipleChoice = [];
     _selectedDropdown = [];
 
+    // ignore: unused_local_variable
     for (var question in widget.form.questions) {
       _textControllers.add(TextEditingController());
       _checkboxValues.add(false);

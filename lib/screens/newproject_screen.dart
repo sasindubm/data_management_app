@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../controllers/project_controller.dart';
+import '../models/project.dart';
+
 
 class NewProjectScreen extends StatefulWidget {
   const NewProjectScreen({super.key});
@@ -10,9 +13,17 @@ class NewProjectScreen extends StatefulWidget {
 
 class _NewProjectScreenState extends State<NewProjectScreen> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _dateController = TextEditingController();
+  final TextEditingController _projectNameController = TextEditingController();
+  final TextEditingController _projectTitleController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _startDateController = TextEditingController();
+  final TextEditingController _endDateController = TextEditingController();
+  
+  String? _selectedDepartment;
+  String? _selectedSector;
+  String? _selectedStatus;
 
-  Future<void> _selectDate(BuildContext context) async {
+  Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -21,9 +32,19 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
     );
     if (picked != null) {
       setState(() {
-        _dateController.text = DateFormat('yyyy-MM-dd').format(picked);
+        controller.text = DateFormat('yyyy-MM-dd').format(picked);
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _projectNameController.dispose();
+    _projectTitleController.dispose();
+    _descriptionController.dispose();
+    _startDateController.dispose();
+    _endDateController.dispose();
+    super.dispose();
   }
 
   @override
@@ -54,6 +75,7 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
                       children: [
                         const SizedBox(height: 20),
                         TextFormField(
+                          controller: _projectNameController,
                           decoration: const InputDecoration(
                             labelText: 'Project Name',
                             border: OutlineInputBorder(),
@@ -67,13 +89,21 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
                         ),
                         const SizedBox(height: 20),
                         TextFormField(
+                          controller: _projectTitleController,
                           decoration: const InputDecoration(
-                            labelText: 'Project Name',
+                            labelText: 'Project Title',
                             border: OutlineInputBorder(),
                           ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter a project title';
+                            }
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 20),
                         TextFormField(
+                          controller: _descriptionController,
                           decoration: const InputDecoration(
                             labelText: 'Description',
                             border: OutlineInputBorder(),
@@ -86,14 +116,19 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
                           child: DropdownMenu(
                             dropdownMenuEntries: const [
                               DropdownMenuEntry(
-                                  value: 'edu', label: 'Education Department'),
+                                  value: '1', label: 'Education Department'),
                               DropdownMenuEntry(
-                                  value: 'agri', label: 'Agricultural Department'),
+                                  value: '2', label: 'Agricultural Department'),
                               DropdownMenuEntry(
-                                  value: 'fish', label: 'Fishery Department'),
+                                  value: '3', label: 'Fishery Department'),
                             ],
                             label: const Text('Department'),
                             textAlign: TextAlign.start,
+                            onSelected: (value) {
+                              setState(() {
+                                _selectedDepartment = value as String?;
+                              });
+                            },
                           ),
                         ),
                         const SizedBox(height: 20),
@@ -102,14 +137,19 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
                           child: DropdownMenu(
                             dropdownMenuEntries: const [
                               DropdownMenuEntry(
-                                  value: 'admin', label: 'Administration'),
+                                  value: '1', label: 'Administration'),
                               DropdownMenuEntry(
-                                  value: 'acc', label: 'Accounting'),
+                                  value: '2', label: 'Accounting'),
                               DropdownMenuEntry(
-                                  value: 'dev', label: 'Development'),
+                                  value: '3', label: 'Development'),
                             ],
                             label: const Text('Sector'),
                             textAlign: TextAlign.start,
+                            onSelected: (value) {
+                              setState(() {
+                                _selectedSector = value as String?;
+                              });
+                            },
                           ),
                         ),
                         const SizedBox(height: 20),
@@ -121,7 +161,7 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
                                   value: 'new',
                                   label: 'New Project'),
                               DropdownMenuEntry(
-                                  value: 'continuous',
+                                  value: 'canceled',
                                   label: 'Canceled Project'),
                               DropdownMenuEntry(
                                   value: 'completed',
@@ -129,22 +169,33 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
                             ],
                             label: const Text('Project Status'),
                             textAlign: TextAlign.start,
+                            onSelected: (value) {
+                              setState(() {
+                                _selectedStatus = value as String?;
+                              });
+                            },
                           ),
                         ),
                         const SizedBox(height: 20),
                         TextFormField(
-                          controller: _dateController,
+                          controller: _startDateController,
                           decoration: const InputDecoration(
                             labelText: 'Started Date',
                             border: OutlineInputBorder(),
                             suffixIcon: Icon(Icons.calendar_today),
                           ),
                           readOnly: true,
-                          onTap: () => _selectDate(context),
+                          onTap: () => _selectDate(context, _startDateController),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please select a start date';
+                            }
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 20),
                         TextFormField(
-                          controller: _dateController,
+                          controller: _endDateController,
                           decoration: const InputDecoration(
                             labelText: 'Finished Date',
                             border: OutlineInputBorder(),
@@ -152,12 +203,36 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
                             helperText: 'Leave empty for New Projects',
                           ),
                           readOnly: true,
-                          onTap: () => _selectDate(context),
+                          onTap: () => _selectDate(context, _endDateController),
                         ),
                         const SizedBox(height: 20),
                         ElevatedButton(
-                          onPressed: () {
-                            
+                          onPressed: () async {
+                            if (_formKey.currentState!.validate()) {
+                              final newProject = Project(
+                                projectId: 0,
+                                projectName: _projectNameController.text,
+                                projectTitle: _projectTitleController.text,
+                                projectDescription: _descriptionController.text,
+                                projectStatus: _selectedStatus ?? 'new',
+                                departmentId: int.parse(_selectedDepartment ?? '1'),
+                                sectorId: int.parse(_selectedSector ?? '1'),
+                                userId: 1, // Placeholder user ID
+                                startedDate: DateTime.parse(_startDateController.text),
+                                finishedDate: _endDateController.text.isNotEmpty
+                                    ? DateTime.parse(_endDateController.text)
+                                    : null,
+                              );
+
+                              final controller = ProjectController();
+                              await controller.createProject(newProject);
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Project Created Successfully')),
+                              );
+
+                              Navigator.pop(context);
+                            }
                           },
                           child: const Text('Create Project'),
                         ),
