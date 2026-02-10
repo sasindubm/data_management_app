@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
-import 'newproject_screen.dart';
-import 'newform_screen.dart';
 import 'login_screen.dart';
 import '../widgets/wifi_status_icon.dart';
+import '../repositories/project_repository.dart';
+import '../repositories/form_repository.dart';
+import '../repositories/response_repository.dart';
+import '../repositories/user_repository.dart';
+import '../repositories/ministry_repository.dart';
+import '../repositories/sector_repository.dart';
+import '../models/form.dart' as form_model;
+import '../models/response.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final int userId;
+  final String username;
+  const HomeScreen({super.key, required this.userId, required this.username});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -15,17 +23,37 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late List<Map<String, dynamic>> _cards;
+  late ProjectRepository _projectRepo;
+  late FormRepository _formRepo;
+  late ResponseRepository _responseRepo;
+  late UserRepository _userRepo;
+  late MinistryRepository _ministryRepo;
+  late SectorRepository _sectorRepo;
+
+  List<form_model.Form> _recentForms = [];
+  List<Response> _pendingUploads = [];
+  String _ministryName = '';
+  String _sectorName = '';
+
+  String get username => widget.username;
 
   @override
   void initState() {
     super.initState();
+    _projectRepo = ProjectRepository();
+    _formRepo = FormRepository();
+    _responseRepo = ResponseRepository();
+    _userRepo = UserRepository();
+    _ministryRepo = MinistryRepository();
+    _sectorRepo = SectorRepository();
+
     _cards = [
       {
         'icon': Icons.folder,
         'label': 'Total Projects',
         'count': 0,
         'onclick': () {
-          Navigator.pushNamed(context, '/project');
+          Navigator.pushNamed(context, '/project', arguments: widget.userId);
         }
       },
       {
@@ -53,6 +81,68 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       },
     ];
+    _loadDashboardData();
+  }
+
+  void updateCardCount(String label, int count) {
+    setState(() {
+      final index = _cards.indexWhere((card) => card['label'] == label);
+      if (index != -1) {
+        _cards[index]['count'] = count;
+      }
+    });
+  }
+
+  Future<void> _loadDashboardData() async {
+    try {
+      // Load user info to get ministry and sector
+      final user = await _userRepo.getUserById(widget.userId);
+      if (user != null) {
+        if (user.ministryId != null) {
+          final ministry =
+              await _ministryRepo.getMinistryById(user.ministryId!);
+          if (ministry != null) {
+            setState(() {
+              _ministryName = ministry.ministryName;
+            });
+          }
+        }
+        if (user.sectorId != null) {
+          final sector = await _sectorRepo.getSectorById(user.sectorId!);
+          if (sector != null) {
+            setState(() {
+              _sectorName = sector.sectorName;
+            });
+          }
+        }
+      }
+
+      // Load projects and update card count
+      final projects = await _projectRepo.getProjectsByUserId(widget.userId);
+      updateCardCount('Total Projects', projects.length);
+
+      // Load all forms and update card count
+      final forms = await _formRepo.getAllForms();
+      updateCardCount('Total Forms', forms.length);
+
+      // Load recent forms (limit to 3)
+      setState(() {
+        _recentForms = forms.take(3).toList();
+      });
+
+      // Load responses and update card count
+      final responses = await _responseRepo.getAllResponses();
+      updateCardCount('Total Responses', responses.length);
+
+      // Load pending uploads (responses by user)
+      final userResponses =
+          await _responseRepo.getResponsesByUserId(widget.userId);
+      setState(() {
+        _pendingUploads = userResponses.take(3).toList();
+      });
+    } catch (e) {
+      debugPrint('Error loading dashboard data: $e');
+    }
   }
 
   @override
@@ -86,7 +176,8 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Icon(Icons.work),
             label: 'Create Project',
             onTap: () {
-              Navigator.pushNamed(context, '/new-project');
+              Navigator.pushNamed(context, '/new-project',
+                  arguments: widget.userId);
             },
           ),
         ],
@@ -123,7 +214,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             value: 'login',
                             child: Text('Logout'),
                           ),
-                          // Add more menu items here if needed
                         ],
                       );
 
@@ -146,13 +236,35 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 40),
               Align(
                 alignment: Alignment.centerLeft,
-                child: Text(
-                  'Hello, User!',
-                  style: GoogleFonts.jetBrainsMono(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Hello, ${widget.username}!',
+                      style: GoogleFonts.jetBrainsMono(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (_ministryName.isNotEmpty)
+                      Text(
+                        'Ministry: $_ministryName',
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 14,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                    if (_sectorName.isNotEmpty)
+                      Text(
+                        'Sector: $_sectorName',
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 14,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                  ],
                 ),
               ),
               const SizedBox(height: 20),
@@ -221,95 +333,51 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             const SizedBox(height: 10),
-                            Card(
-                              elevation: 4,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12.0),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        'Housing Survey\nChief Secretariat',
-                                        style: GoogleFonts.jetBrainsMono(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black,
-                                        ),
+                            if (_recentForms.isEmpty)
+                              Center(
+                                child: Text(
+                                  'No forms available',
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 14,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              )
+                            else
+                              ..._recentForms.map((form) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 10.0),
+                                  child: Card(
+                                    elevation: 4,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(12.0),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              'Form #${form.formId}\nProject #${form.projectId}',
+                                              style: GoogleFonts.jetBrainsMono(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.black,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Icon(
+                                            Icons.play_arrow,
+                                            size: 30,
+                                            color: Colors.green,
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    const SizedBox(width: 10),
-                                    Icon(
-                                      Icons.play_arrow,
-                                      size: 30,
-                                      color: Colors.green,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Card(
-                              elevation: 4,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12.0),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        'Housing Survey\nChief Secretariat',
-                                        style: GoogleFonts.jetBrainsMono(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Icon(
-                                      Icons.play_arrow,
-                                      size: 30,
-                                      color: Colors.green,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Card(
-                              elevation: 4,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12.0),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        'Housing Survey\nChief Secretariat',
-                                        style: GoogleFonts.jetBrainsMono(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Icon(
-                                      Icons.play_arrow,
-                                      size: 30,
-                                      color: Colors.green,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
+                                  ),
+                                );
+                              }).toList(),
                           ],
                         ),
                       ),
@@ -341,119 +409,60 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             const SizedBox(height: 10),
-                            Card(
-                              elevation: 4,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12.0),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        'Housing Survey\nChief Secretariat',
-                                        style: GoogleFonts.jetBrainsMono(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      '10 Responses',
-                                      style: GoogleFonts.jetBrainsMono(
-                                        fontSize: 12,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Icon(
-                                      Icons.upload,
-                                      size: 30,
-                                      color: Colors.red,
-                                    ),
-                                  ],
+                            if (_pendingUploads.isEmpty)
+                              Center(
+                                child: Text(
+                                  'No pending uploads',
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 14,
+                                    color: Colors.grey,
+                                  ),
                                 ),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Card(
-                              elevation: 4,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12.0),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        'Housing Survey\nChief Secretariat',
-                                        style: GoogleFonts.jetBrainsMono(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black,
-                                        ),
+                              )
+                            else
+                              ..._pendingUploads.map((response) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 10.0),
+                                  child: Card(
+                                    elevation: 4,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(12.0),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              'Response #${response.responseId}\nForm #${response.formId}',
+                                              style: GoogleFonts.jetBrainsMono(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.black,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Text(
+                                            response.responseStatus ??
+                                                'Pending',
+                                            style: GoogleFonts.jetBrainsMono(
+                                              fontSize: 12,
+                                              color: Colors.grey,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Icon(
+                                            Icons.upload,
+                                            size: 30,
+                                            color: Colors.red,
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      '10 Responses',
-                                      style: GoogleFonts.jetBrainsMono(
-                                        fontSize: 12,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Icon(
-                                      Icons.upload,
-                                      size: 30,
-                                      color: Colors.red,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Card(
-                              elevation: 4,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12.0),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        'Housing Survey\nChief Secretariat',
-                                        style: GoogleFonts.jetBrainsMono(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      '10 Responses',
-                                      style: GoogleFonts.jetBrainsMono(
-                                        fontSize: 12,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Icon(
-                                      Icons.upload,
-                                      size: 30,
-                                      color: Colors.red,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
+                                  ),
+                                );
+                              }).toList(),
                           ],
                         ),
                       ),

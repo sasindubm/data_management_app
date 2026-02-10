@@ -5,12 +5,22 @@ import '../utils/crypto_helper.dart';
 class AuthService {
   final UserRepository _userRepo = UserRepository();
 
-  Future<String?> registerUser(String username, String password) async {
+  Future<String?> registerUser(
+    String username,
+    String password, {
+    int? ministryId,
+    int? sectorId,
+  }) async {
     final exists = await _userRepo.usernameExists(username);
     if (exists) return 'Username already exists.';
 
     final hashedPassword = CryptoHelper.hashPassword(password);
-    final user = User(username: username, password: hashedPassword);
+    final user = User(
+      username: username,
+      password: hashedPassword,
+      ministryId: ministryId,
+      sectorId: sectorId,
+    );
     final userId = await _userRepo.insertUser(user);
 
     return userId > 0 ? null : 'Failed to create account.';
@@ -27,7 +37,8 @@ class AuthService {
     return null;
   }
 
-  Future<bool> changePassword(int userId, String oldPassword, String newPassword) async {
+  Future<bool> changePassword(
+      int userId, String oldPassword, String newPassword) async {
     final user = await _userRepo.getUserById(userId);
     if (user == null) return false;
 
@@ -44,6 +55,4 @@ class AuthService {
     final rowsAffected = await _userRepo.updateUser(updatedUser);
     return rowsAffected > 0;
   }
-
-
 }

@@ -6,12 +6,10 @@ import '../screens/newform_screen.dart';
 import '../screens/project_screen.dart';
 import '../screens/form_screen.dart';
 import '../screens/newproject_screen.dart';
-import '../screens/home_screen.dart';
 import '../screens/login_screen.dart';
 
 class AppRoutes {
   final Map<String, WidgetBuilder> appRoutes = {
-    '/home': (context) => HomeScreen(),
     '/': (context) => LoginScreen(),
     '/reg': (context) => SignupScreen(),
     '/new-project': (context) => NewProjectScreen(),

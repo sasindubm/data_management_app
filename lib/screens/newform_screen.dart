@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
+import '../controllers/form_controller.dart';
+import '../repositories/project_repository.dart';
+import '../models/project.dart';
 import 'response_collection_screen.dart';
 
 enum QuestionType { text, checkbox, multipleChoice, dropdown }
@@ -79,7 +82,35 @@ class NewFormScreen extends StatefulWidget {
 
 class NewFormScreenState extends State<NewFormScreen> {
   final List<QuestionField> _fields = [];
-  String? _selectedProject;
+  int? _selectedProjectId;
+  List<Project> _projects = [];
+  bool _isLoadingProjects = true;
+
+  final FormController _formController = FormController();
+  final ProjectRepository _projectRepo = ProjectRepository();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProjects();
+  }
+
+  Future<void> _loadProjects() async {
+    try {
+      final projects = await _projectRepo.getAllProjects();
+      setState(() {
+        _projects = projects;
+        _isLoadingProjects = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoadingProjects = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading projects: $e')),
+      );
+    }
+  }
 
   void _addField(QuestionType type) {
     setState(() {
@@ -138,7 +169,7 @@ class NewFormScreenState extends State<NewFormScreen> {
     return text;
   }
 
-  void _createForm() {
+  void _createForm() async {
     if (_fields.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Please add at least one question')),
@@ -146,72 +177,127 @@ class NewFormScreenState extends State<NewFormScreen> {
       return;
     }
 
-    // Convert fields to saved questions
-    List<SavedQuestion> savedQuestions = _fields.map((field) {
-      return SavedQuestion(
-        type: field.type,
-        question: field.controller.text.isEmpty
+    if (_selectedProjectId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please select a project')),
+      );
+      return;
+    }
+
+    // Prepare questions data
+    List<Map<String, dynamic>> questionsData = _fields.map((field) {
+      return {
+        'questionText': field.controller.text.isEmpty
             ? 'Untitled Question'
             : field.controller.text,
-        options: List.from(field.options),
-      );
+        'questionType': field.type.toString().split('.').last,
+        'options': field.options,
+      };
     }).toList();
 
-    // Create the form object
-    CreatedForm createdForm = CreatedForm(
-      projectName: _selectedProject ?? 'Untitled Project',
-      questions: savedQuestions,
-      createdAt: DateTime.now(),
-    );
-
-    // Show success dialog
+    // Show loading dialog
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: Row(
+        content: Row(
           children: [
-            Icon(Icons.check_circle, color: Colors.green, size: 28),
-            SizedBox(width: 8),
-            Text('Form Created!'),
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('Creating form...'),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Your form has been created successfully.'),
-            SizedBox(height: 16),
-            Text(
-              'Project: ${createdForm.projectName}',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            Text('Questions: ${createdForm.questions.length}'),
-            SizedBox(height: 16),
-            Text('Would you like to start collecting responses?'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Later'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context); // Close dialog
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ResponseCollectionScreen(
-                    form: createdForm,
-                  ),
-                ),
-              );
-            },
-            child: Text('Start Collecting'),
-          ),
-        ],
       ),
     );
+
+    // Create form in database
+    final formId = await _formController.createFormWithQuestions(
+      projectId: _selectedProjectId!,
+      questionsData: questionsData,
+    );
+
+    Navigator.pop(context); // Close loading dialog
+
+    if (formId != null && formId > 0) {
+      // Find project name
+      final selectedProject = _projects.firstWhere(
+        (p) => p.projectId == _selectedProjectId,
+        orElse: () => Project(
+          projectId: _selectedProjectId,
+          projectName: 'Project',
+          projectLocation: '',
+          projectDescription: '',
+          projectStatus: '',
+          ministryId: 0,
+          fundSource: '',
+          userId: 0,
+          startedDate: DateTime.now(),
+        ),
+      );
+
+      // Show success dialog
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green, size: 28),
+              SizedBox(width: 8),
+              Text('Form Created!'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Your form has been created successfully.'),
+              SizedBox(height: 16),
+              Text(
+                'Project: ${selectedProject.projectName}',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              Text('Form ID: $formId'),
+              Text('Questions: ${_fields.length}'),
+              SizedBox(height: 16),
+              Text('Would you like to start collecting responses?'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                // Clear form
+                setState(() {
+                  _fields.clear();
+                  _selectedProjectId = null;
+                });
+              },
+              child: Text('Create Another'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                // Navigate to response collection
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ResponseCollectionScreen(
+                      formId: formId!,
+                      userId: selectedProject.userId,
+                    ),
+                  ),
+                );
+              },
+              child: Text('Start Collecting'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to create form')),
+      );
+    }
   }
 
   Widget _buildField(int index, String text) {
@@ -370,8 +456,6 @@ class NewFormScreenState extends State<NewFormScreen> {
             ),
           ],
         );
-      default:
-        return SizedBox.shrink();
     }
   }
 
@@ -402,29 +486,33 @@ class NewFormScreenState extends State<NewFormScreen> {
                       children: [
                         Align(
                           alignment: Alignment.centerLeft,
-                          child: DropdownButton<String>(
-                            value: _selectedProject,
-                            hint: Text('Select Project'),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'option1',
-                                child: Text('Option 1'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'option2',
-                                child: Text('Option 2'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'option3',
-                                child: Text('Option 3'),
-                              ),
-                            ],
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedProject = value;
-                              });
-                            },
-                          ),
+                          child: _isLoadingProjects
+                              ? SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : DropdownButton<int>(
+                                  value: _selectedProjectId,
+                                  hint: Text('Select Project'),
+                                  items: _projects
+                                      .map((project) => DropdownMenuItem(
+                                            value: project.projectId,
+                                            child: Text(
+                                              project.projectName,
+                                              style:
+                                                  GoogleFonts.jetBrainsMono(),
+                                            ),
+                                          ))
+                                      .toList(),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _selectedProjectId = value;
+                                    });
+                                  },
+                                ),
                         ),
                         const SizedBox(height: 16.0),
                         Text(
@@ -508,5 +596,13 @@ class NewFormScreenState extends State<NewFormScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    for (var field in _fields) {
+      field.controller.dispose();
+    }
+    super.dispose();
   }
 }

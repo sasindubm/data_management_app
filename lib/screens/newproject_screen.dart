@@ -3,10 +3,8 @@ import 'package:intl/intl.dart';
 import '../controllers/project_controller.dart';
 import '../models/project.dart';
 
-
 class NewProjectScreen extends StatefulWidget {
   const NewProjectScreen({super.key});
-
   @override
   State<NewProjectScreen> createState() => _NewProjectScreenState();
 }
@@ -14,16 +12,15 @@ class NewProjectScreen extends StatefulWidget {
 class _NewProjectScreenState extends State<NewProjectScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _projectNameController = TextEditingController();
-  final TextEditingController _projectTitleController = TextEditingController();
+  final TextEditingController _projectLocationController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _startDateController = TextEditingController();
   final TextEditingController _endDateController = TextEditingController();
-  
-  String? _selectedDepartment;
-  String? _selectedSector;
+  String? _selectedMinistry;
+  String? _selectedFundSource;
   String? _selectedStatus;
-
-  Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
+  Future<void> _selectDate(
+      BuildContext context, TextEditingController controller) async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -40,7 +37,7 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
   @override
   void dispose() {
     _projectNameController.dispose();
-    _projectTitleController.dispose();
+    _projectLocationController.dispose();
     _descriptionController.dispose();
     _startDateController.dispose();
     _endDateController.dispose();
@@ -49,6 +46,7 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final userId = ModalRoute.of(context)!.settings.arguments as int;
     return Scaffold(
       appBar: AppBar(title: const Text('New Project')),
       body: Center(
@@ -89,14 +87,14 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
                         ),
                         const SizedBox(height: 20),
                         TextFormField(
-                          controller: _projectTitleController,
+                          controller: _projectLocationController,
                           decoration: const InputDecoration(
-                            labelText: 'Project Title',
+                            labelText: 'Project Location',
                             border: OutlineInputBorder(),
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Please enter a project title';
+                              return 'Please enter a project location';
                             }
                             return null;
                           },
@@ -116,17 +114,40 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
                           child: DropdownMenu(
                             dropdownMenuEntries: const [
                               DropdownMenuEntry(
-                                  value: '1', label: 'Education Department'),
+                                  value: '1', label: 'Chief Ministry'),
                               DropdownMenuEntry(
-                                  value: '2', label: 'Agricultural Department'),
+                                  value: '2', label: 'Agricultural Ministry'),
                               DropdownMenuEntry(
-                                  value: '3', label: 'Fishery Department'),
+                                  value: '3', label: 'Fishery Ministry'),
+                              DropdownMenuEntry(
+                                  value: '4', label: 'Sports Ministry'),
+                              DropdownMenuEntry(
+                                  value: '5', label: 'Education Ministry'),
                             ],
-                            label: const Text('Department'),
+                            label: const Text('Ministry'),
                             textAlign: TextAlign.start,
                             onSelected: (value) {
                               setState(() {
-                                _selectedDepartment = value as String?;
+                                _selectedMinistry = value;
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: DropdownMenu(
+                            dropdownMenuEntries: const [
+                              DropdownMenuEntry(value: 'cbg', label: 'CBG'),
+                              DropdownMenuEntry(value: 'psdg', label: 'PSDG'),
+                              DropdownMenuEntry(
+                                  value: 'maintainance', label: 'Maintainance'),
+                            ],
+                            label: const Text('Fund Source'),
+                            textAlign: TextAlign.start,
+                            onSelected: (value) {
+                              setState(() {
+                                _selectedFundSource = value;
                               });
                             },
                           ),
@@ -137,32 +158,9 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
                           child: DropdownMenu(
                             dropdownMenuEntries: const [
                               DropdownMenuEntry(
-                                  value: '1', label: 'Administration'),
+                                  value: 'new', label: 'New Project'),
                               DropdownMenuEntry(
-                                  value: '2', label: 'Accounting'),
-                              DropdownMenuEntry(
-                                  value: '3', label: 'Development'),
-                            ],
-                            label: const Text('Sector'),
-                            textAlign: TextAlign.start,
-                            onSelected: (value) {
-                              setState(() {
-                                _selectedSector = value as String?;
-                              });
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: DropdownMenu(
-                            dropdownMenuEntries: const [
-                              DropdownMenuEntry(
-                                  value: 'new',
-                                  label: 'New Project'),
-                              DropdownMenuEntry(
-                                  value: 'canceled',
-                                  label: 'Canceled Project'),
+                                  value: 'canceled', label: 'Canceled Project'),
                               DropdownMenuEntry(
                                   value: 'completed',
                                   label: 'Completed Project'),
@@ -171,7 +169,7 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
                             textAlign: TextAlign.start,
                             onSelected: (value) {
                               setState(() {
-                                _selectedStatus = value as String?;
+                                _selectedStatus = value;
                               });
                             },
                           ),
@@ -185,7 +183,8 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
                             suffixIcon: Icon(Icons.calendar_today),
                           ),
                           readOnly: true,
-                          onTap: () => _selectDate(context, _startDateController),
+                          onTap: () =>
+                              _selectDate(context, _startDateController),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Please select a start date';
@@ -210,27 +209,26 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
                           onPressed: () async {
                             if (_formKey.currentState!.validate()) {
                               final newProject = Project(
-                                projectId: 0,
                                 projectName: _projectNameController.text,
-                                projectTitle: _projectTitleController.text,
+                                projectLocation: _projectLocationController.text,
                                 projectDescription: _descriptionController.text,
                                 projectStatus: _selectedStatus ?? 'new',
-                                departmentId: int.parse(_selectedDepartment ?? '1'),
-                                sectorId: int.parse(_selectedSector ?? '1'),
-                                userId: 1, // Placeholder user ID
-                                startedDate: DateTime.parse(_startDateController.text),
+                                ministryId: int.parse(_selectedMinistry ?? '1'),
+                                fundSource: _selectedFundSource ?? 'cbg',
+                                userId: userId,
+                                startedDate:
+                                    DateTime.parse(_startDateController.text),
                                 finishedDate: _endDateController.text.isNotEmpty
                                     ? DateTime.parse(_endDateController.text)
                                     : null,
                               );
-
                               final controller = ProjectController();
                               await controller.createProject(newProject);
-
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Project Created Successfully')),
+                                const SnackBar(
+                                    content:
+                                        Text('Project Created Successfully')),
                               );
-
                               Navigator.pop(context);
                             }
                           },

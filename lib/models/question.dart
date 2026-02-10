@@ -1,19 +1,19 @@
 class Question {
-  final int questionID;
+  final int? questionId;
   final String questionText;
-  final String questionType;
+  final String? questionType;
   final int formId;
 
   Question({
-    required this.questionID,
+    this.questionId,
     required this.questionText,
-    required this.questionType,
+    this.questionType,
     required this.formId,
-});
+  });
 
   Map<String, dynamic> toMap() {
     return {
-      'QuestionID': questionID,
+      'QuestionId': questionId,
       'QuestionText': questionText,
       'QuestionType': questionType,
       'FormId': formId,
@@ -22,11 +22,10 @@ class Question {
 
   factory Question.fromMap(Map<String, dynamic> map) {
     return Question(
-      questionID: map['QuestionID'],
+      questionId: map['QuestionId'],
       questionText: map['QuestionText'],
       questionType: map['QuestionType'],
       formId: map['FormId'],
     );
   }
 }
-

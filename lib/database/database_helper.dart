@@ -26,12 +26,45 @@ class DatabaseHelper {
 
   Future<void> _createDatabase(Database db, int version) async {
     final batch = db.batch();
+    await db.execute('PRAGMA foreign_keys = ON');
+
+    batch.execute('''
+      CREATE TABLE Ministry (
+        MinistryId INTEGER PRIMARY KEY AUTOINCREMENT,
+        MinistryName TEXT NOT NULL
+      )''');
+
+    batch.execute('''
+      INSERT INTO Ministry (MinistryName) VALUES
+        ('Chief Ministry'),
+        ('Agricultural Ministry'),
+        ('Fishery Ministry'),
+        ('Sports Ministry'),
+        ('Education Ministry')
+      ''');
+
+    batch.execute('''
+      CREATE TABLE Sector (
+        SectorId INTEGER PRIMARY KEY AUTOINCREMENT,
+        SectorName TEXT NOT NULL
+      )
+    ''');
+
+    batch.execute('''
+      INSERT INTO Sector (SectorName) VALUES
+        ('Planning Sector'),
+        ('Evaluation Sector')
+      ''');
 
     batch.execute('''
       CREATE TABLE User (
         UserId INTEGER PRIMARY KEY AUTOINCREMENT,
         Username TEXT UNIQUE NOT NULL,
-        Password TEXT NOT NULL
+        Password TEXT NOT NULL,
+        MinistryId INTEGER,
+        SectorId INTEGER,
+        FOREIGN KEY (MinistryId) REFERENCES Ministry(MinistryId),
+        FOREIGN KEY (SectorId) REFERENCES Sector(SectorId)
       )''');
 
     batch.execute('''
@@ -83,43 +116,34 @@ class DatabaseHelper {
       )''');
 
     batch.execute('''
-      Form (
+      CREATE TABLE AnswerChoice (
+        AnswerId INTEGER,
+        ChoiceId INTEGER,
+        PRIMARY KEY (AnswerId, ChoiceId),
+        FOREIGN KEY (AnswerId) REFERENCES Answer(AnswerId),
+        FOREIGN KEY (ChoiceId) REFERENCES Choice(ChoiceId)
+      )''');
+
+    batch.execute('''
+      CREATE TABLE Form (
         FormId INTEGER PRIMARY KEY AUTOINCREMENT,
         ProjectId INTEGER,
         FOREIGN KEY (ProjectId) REFERENCES Project(ProjectId)
       )''');
 
     batch.execute('''
-      CREATE TABLE Project (
+      CREATE TABLE Project(
         ProjectId INTEGER PRIMARY KEY AUTOINCREMENT,
-        ProjectName TEXT NOT NULL,
-        ProjectTitle TEXT,
+        ProjectName TEXT,
+        ProjectLocation TEXT,
         ProjectDescription TEXT,
         ProjectStatus TEXT,
-        SectorId INTEGER,
+        MinistryId INTEGER,
+        FundSource TEXT,
         UserId INTEGER,
-        StartDate DATE,
-        FinishedDate DATE,
-        FOREIGN KEY (SectorId) REFERENCES Sector(SectorId),
-        FOREIGN KEY (UserId) REFERENCES User(UserId)
-    )
-    ''');
-
-    batch.execute('''
-      CREATE TABLE Department (
-        DepartmentId INTEGER PRIMARY KEY AUTOINCREMENT,
-        DepartmentName TEXT NOT NULL
-    )
-    ''');
-
-    batch.execute('''
-      CREATE TABLE Sector (
-        SectorId INTEGER PRIMARY KEY AUTOINCREMENT,
-        DepartmentId INTEGER,
-        SectorName TEXT NOT NULL,
-        FOREIGN KEY (DepartmentId) REFERENCES Department(DepartmentId)
-    )
-    ''');
+        StartedDate TEXT,
+        FinishedDate TEXT
+      )''');
 
     batch.execute('''
       CREATE TABLE ProjectAssignment (
@@ -130,15 +154,6 @@ class DatabaseHelper {
     ''');
 
     batch.execute('''
-      CREATE TABLE AnswerChoice (
-          AnswerId INTEGER,
-          ChoiceId INTEGER,
-          PRIMARY KEY (AnswerId, ChoiceId),
-          FOREIGN KEY (AnswerId) REFERENCES Answer(AnswerId),
-          FOREIGN KEY (ChoiceId) REFERENCES Choice(ChoiceId)
-      )''');
-
-    batch.execute('''
       CREATE TABLE UserCreatesProject (
           UCPId INTEGER PRIMARY KEY,
           UserId INTEGER,
@@ -146,6 +161,23 @@ class DatabaseHelper {
           FOREIGN KEY (UserId) REFERENCES User(UserId),
           FOREIGN KEY (ProjectId) REFERENCES Project(ProjectId)
       )''');
+
+    // batch.execute(
+    //     ''' CREATE TABLE MinistrySector ( MinistryId INTEGER NOT NULL, SectorId INTEGER NOT NULL, PRIMARY KEY (MinistryId, SectorId), FOREIGN KEY (MinistryId) REFERENCES Ministry (MinistryId) ON DELETE CASCADE, FOREIGN KEY (SectorId) REFERENCES Sector (SectorId) ON DELETE CASCADE ) ''');
+
+    // batch.execute('''
+    //   INSERT INTO MinistrySector (MinistryId, SectorId) VALUES
+    //     (1, 1),
+    //     (1, 2),
+    //     (2, 1),
+    //     (2, 2),
+    //     (3, 1),
+    //     (3, 2),
+    //     (4, 1),
+    //     (4, 2),
+    //     (5, 1),
+    //     (5, 2)
+    //   ''');
 
     await batch.commit();
   }

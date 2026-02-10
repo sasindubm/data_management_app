@@ -1,7 +1,6 @@
 import 'home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'signup_screen.dart';
 import '../controllers/login_controller.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -26,7 +25,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     final username = _usernameController.text.trim();
-    final password = _passwordController.text;
+    final password = _passwordController.text.trim();
 
     if (username.isEmpty || password.isEmpty) {
       setState(() {
@@ -38,16 +37,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final result = await _loginController.login(username, password);
 
-    if (result == null) {
+    if (result != null && result.userId != null) {
       setState(() => _isLoading = false);
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
+        MaterialPageRoute(builder: (context) => HomeScreen(userId: result.userId!, username: result.username!)),
       );
     } else {
       setState(() {
         _isLoading = false;
-        _errorMessage = result;
+        _errorMessage = 'Invalid username or password';
       });
     }
   }

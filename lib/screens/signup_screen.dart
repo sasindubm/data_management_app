@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../controllers/signup_controller.dart';
+import '../models/ministry.dart';
+import '../models/sector.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -15,34 +17,55 @@ class _SignupScreenState extends State<SignupScreen> {
 
   bool _isLoading = false;
   String? _errorMessage;
+  List<Ministry> _ministries = [];
+  List<Sector> _sectors = [];
+  Ministry? _selectedMinistry;
+  Sector? _selectedSector;
 
   final SignupController _signupController = SignupController();
 
-void _handleSignUp() {
-  setState(() {
-    _isLoading = true;
-    _errorMessage = null;
-  });
+  @override
+  void initState() {
+    super.initState();
+    _loadMinistryAndSector();
+  }
 
-  _signupController.handleSignUp(
-    context: context,
-    username: _usernameController.text.trim(),
-    password: _passwordController.text,
-    onError: (message) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = message;
-      });
-    },
-    onSuccess: () {
-      setState(() {
-        _isLoading = false;
-      });
-      _usernameController.clear();
-      _passwordController.clear();
-    },
-  );
-}
+  Future<void> _loadMinistryAndSector() async {
+    final ministries = await _signupController.getMinistries();
+    final sectors = await _signupController.getSectors();
+    setState(() {
+      _ministries = (ministries).cast<Ministry>();
+      _sectors = (sectors).cast<Sector>();
+    });
+  }
+
+  void _handleSignUp() {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    _signupController.handleSignUp(
+      context: context,
+      username: _usernameController.text.trim(),
+      password: _passwordController.text,
+      ministryId: _selectedMinistry?.ministryId,
+      sectorId: _selectedSector?.sectorId,
+      onError: (message) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = message;
+        });
+      },
+      onSuccess: () {
+        setState(() {
+          _isLoading = false;
+        });
+        _usernameController.clear();
+        _passwordController.clear();
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -99,6 +122,56 @@ void _handleSignUp() {
                     border: OutlineInputBorder(),
                   ),
                   style: GoogleFonts.jetBrainsMono(),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<Ministry>(
+                  value: _selectedMinistry,
+                  hint: Text(
+                    'Select Ministry',
+                    style: GoogleFonts.jetBrainsMono(),
+                  ),
+                  items: _ministries
+                      .map((ministry) => DropdownMenuItem(
+                            value: ministry,
+                            child: Text(
+                              ministry.ministryName,
+                              style: GoogleFonts.jetBrainsMono(),
+                            ),
+                          ))
+                      .toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedMinistry = value;
+                    });
+                  },
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<Sector>(
+                  value: _selectedSector,
+                  hint: Text(
+                    'Select Sector',
+                    style: GoogleFonts.jetBrainsMono(),
+                  ),
+                  items: _sectors
+                      .map((sector) => DropdownMenuItem(
+                            value: sector,
+                            child: Text(
+                              sector.sectorName,
+                              style: GoogleFonts.jetBrainsMono(),
+                            ),
+                          ))
+                      .toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedSector = value;
+                    });
+                  },
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                  ),
                 ),
                 if (_errorMessage != null) ...[
                   const SizedBox(height: 16),

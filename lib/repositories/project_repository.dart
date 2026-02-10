@@ -32,4 +32,21 @@ class ProjectRepository {
       whereArgs: [projectId],
     );
   }
+
+  Future<List<Project>> getProjectsByUserId(int userId) async {
+    final result = await _dbHelper.query(
+      'Project',
+      where: 'UserId = ?',
+      whereArgs: [userId],
+    );
+    return result.map((map) => Project.fromMap(map)).toList();
+  }
+  Future<List<Project>> getProjectsByMinistryId(int ministryId) async {
+    final result = await _dbHelper.query(
+      'Project',
+      where: 'MinistryId = ?',
+      whereArgs: [ministryId],
+    );
+    return result.map((map) => Project.fromMap(map)).toList();
+  }
 }

@@ -2,14 +2,20 @@ import 'package:flutter/material.dart';
 import '../services/auth_services.dart';
 import '../utils/validators.dart';
 import '../widgets/dialogs.dart';
+import '../repositories/ministry_repository.dart';
+import '../repositories/sector_repository.dart';
 
 class SignupController {
   final AuthService _authService = AuthService();
+  final MinistryRepository _ministryRepo = MinistryRepository();
+  final SectorRepository _sectorRepo = SectorRepository();
 
   Future<void> handleSignUp({
     required BuildContext context,
     required String username,
     required String password,
+    required int? ministryId,
+    required int? sectorId,
     required Function(String?) onError,
     required Function() onSuccess,
   }) async {
@@ -21,7 +27,12 @@ class SignupController {
       return;
     }
 
-    final result = await _authService.registerUser(username, password);
+    final result = await _authService.registerUser(
+      username,
+      password,
+      ministryId: ministryId,
+      sectorId: sectorId,
+    );
 
     if (result == null) {
       onSuccess();
@@ -29,5 +40,13 @@ class SignupController {
     } else {
       onError(result);
     }
+  }
+
+  Future<List<dynamic>> getMinistries() async {
+    return await _ministryRepo.getAllMinistries();
+  }
+
+  Future<List<dynamic>> getSectors() async {
+    return await _sectorRepo.getAllSectors();
   }
 }

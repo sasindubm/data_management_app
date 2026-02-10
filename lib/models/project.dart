@@ -1,23 +1,23 @@
 class Project {
-  final int projectId;
+  final int? projectId;
   final String projectName;
-  final String projectTitle;
+  final String projectLocation;
   final String projectDescription;
   final String projectStatus;
-  final int departmentId;
-  final int sectorId;
+  final int ministryId;
+  final String fundSource;
   final int userId;
   final DateTime startedDate;
   final DateTime? finishedDate;
 
   Project({
-    required this.projectId,
+    this.projectId,
     required this.projectName,
-    required this.projectTitle,
+    required this.projectLocation,
     required this.projectDescription,
     required this.projectStatus,
-    required this.departmentId,
-    required this.sectorId,
+    required this.ministryId,
+    required this.fundSource,
     required this.userId,
     required this.startedDate,
     this.finishedDate,
@@ -26,15 +26,15 @@ class Project {
   Map<String, dynamic> toMap() {
     return {
       'ProjectId': projectId,
-      'ProjectName' : projectName,
-      'ProjectTitle' : projectTitle,
-      'ProjectDescription' : projectDescription,
-      'ProjectStatus' : projectStatus,
-      'DepartmentId' : departmentId,
-      'SectorId' : sectorId,
-      'UserId' : userId,
-      'StartedDate' : startedDate,
-      'FinishedDate' : finishedDate,
+      'ProjectName': projectName,
+      'ProjectLocation': projectLocation,
+      'ProjectDescription': projectDescription,
+      'ProjectStatus': projectStatus,
+      'MinistryId': ministryId,
+      'FundSource': fundSource,
+      'UserId': userId,
+      'StartedDate': startedDate.toIso8601String(),
+      'FinishedDate': finishedDate?.toIso8601String(),
     };
   }
 
@@ -42,14 +42,16 @@ class Project {
     return Project(
       projectId: map['ProjectId'],
       projectName: map['ProjectName'],
-      projectTitle: map['ProjectTitle'],
+      projectLocation: map['ProjectLocation'],
       projectDescription: map['ProjectDescription'],
       projectStatus: map['ProjectStatus'],
-      departmentId: map['DepartmentId'],
-      sectorId: map['SectorId'],
+      ministryId: map['MinistryId'],
+      fundSource: map['FundSource'],
       userId: map['UserId'],
       startedDate: DateTime.parse(map['StartedDate']),
-      finishedDate: map['FinishedDate'] != null ? DateTime.parse(map['FinishedDate']) : null,
+      finishedDate: map['FinishedDate'] != null
+          ? DateTime.parse(map['FinishedDate'])
+          : null,
     );
   }
 }

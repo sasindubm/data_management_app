@@ -1,8 +1,20 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
 import 'utils/theme.dart';
 import 'routes/app_routes.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // ✅ Only override databaseFactory on desktop/web
+  if (!Platform.isAndroid && !Platform.isIOS) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
+
   runApp(const MainApp());
 }
 

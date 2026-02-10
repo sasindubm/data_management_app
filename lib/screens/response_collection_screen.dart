@@ -1,17 +1,25 @@
 import 'package:flutter/material.dart';
 import 'newform_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../controllers/response_controller.dart';
+import '../models/question.dart';
+import '../models/choice.dart';
 
 class ResponseCollectionScreen extends StatefulWidget {
-  final CreatedForm form;
+  final int formId;
+  final int? userId;
+  final CreatedForm? form; // Keep for backward compatibility
 
   const ResponseCollectionScreen({
     super.key,
-    required this.form,
+    required this.formId,
+    this.userId,
+    this.form,
   });
 
   @override
-  ResponseCollectionScreenState createState() => ResponseCollectionScreenState();
+  ResponseCollectionScreenState createState() =>
+      ResponseCollectionScreenState();
 }
 
 class ResponseCollectionScreenState extends State<ResponseCollectionScreen> {
@@ -19,13 +27,45 @@ class ResponseCollectionScreenState extends State<ResponseCollectionScreen> {
   late List<bool> _checkboxValues;
   late List<String?> _selectedMultipleChoice;
   late List<String?> _selectedDropdown;
+  late List<int?> _selectedChoiceIds;
   int _responseCount = 0;
-  final List<Map<String, dynamic>> _allResponses = [];
+  List<Question> _questions = [];
+  List<List<Choice>> _questionChoices = [];
+  bool _isLoading = true;
+
+  final ResponseController _responseController = ResponseController();
 
   @override
   void initState() {
     super.initState();
-    _initializeFields();
+    _loadFormData();
+  }
+
+  Future<void> _loadFormData() async {
+    try {
+      // Load questions from database
+      _questions = await _responseController.getFormQuestions(widget.formId);
+
+      // Load choices for each question
+      for (var question in _questions) {
+        final choices = await _responseController
+            .getQuestionChoices(question.questionId ?? 0);
+        _questionChoices.add(choices);
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      _initializeFields();
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading form: $e')),
+      );
+    }
   }
 
   void _initializeFields() {
@@ -33,13 +73,14 @@ class ResponseCollectionScreenState extends State<ResponseCollectionScreen> {
     _checkboxValues = [];
     _selectedMultipleChoice = [];
     _selectedDropdown = [];
+    _selectedChoiceIds = [];
 
-    // ignore: unused_local_variable
-    for (var question in widget.form.questions) {
+    for (var question in _questions) {
       _textControllers.add(TextEditingController());
       _checkboxValues.add(false);
       _selectedMultipleChoice.add(null);
       _selectedDropdown.add(null);
+      _selectedChoiceIds.add(null);
     }
   }
 
@@ -68,115 +109,133 @@ class ResponseCollectionScreenState extends State<ResponseCollectionScreen> {
     super.dispose();
   }
 
-  void _submitResponse() {
-    Map<String, dynamic> currentResponse = {};
-    
-    for (int i = 0; i < widget.form.questions.length; i++) {
-      var question = widget.form.questions[i];
-      dynamic answer;
-      
-      switch (question.type) {
-        case QuestionType.text:
-          answer = _textControllers[i].text;
+  void _submitResponse() async {
+    // Prepare answers data
+    List<Map<String, dynamic>> answersData = [];
+
+    for (int i = 0; i < _questions.length; i++) {
+      var question = _questions[i];
+      dynamic answerText = '';
+      int? choiceId;
+
+      switch (question.questionType) {
+        case 'text':
+          answerText = _textControllers[i].text;
           break;
-        case QuestionType.checkbox:
-          answer = _checkboxValues[i];
+        case 'checkbox':
+          answerText = _checkboxValues[i].toString();
           break;
-        case QuestionType.multipleChoice:
-          answer = _selectedMultipleChoice[i] ?? "Not selected";
+        case 'multipleChoice':
+          answerText = _selectedMultipleChoice[i] ?? 'Not selected';
+          // Find the choice ID for the selected option
+          if (_selectedMultipleChoice[i] != null) {
+            final choices = _questionChoices[i];
+            final selectedChoice = choices.firstWhere(
+              (c) => c.choiceText == _selectedMultipleChoice[i],
+              orElse: () => Choice(),
+            );
+            choiceId = selectedChoice.choiceId;
+          }
           break;
-        case QuestionType.dropdown:
-          answer = _selectedDropdown[i] ?? "Not selected";
+        case 'dropdown':
+          answerText = _selectedDropdown[i] ?? 'Not selected';
+          // Find the choice ID for the selected option
+          if (_selectedDropdown[i] != null) {
+            final choices = _questionChoices[i];
+            final selectedChoice = choices.firstWhere(
+              (c) => c.choiceText == _selectedDropdown[i],
+              orElse: () => Choice(),
+            );
+            choiceId = selectedChoice.choiceId;
+          }
           break;
       }
-      currentResponse[question.question] = answer;
+
+      answersData.add({
+        'questionId': question.questionId,
+        'answerText': answerText,
+        'choiceId': choiceId,
+      });
     }
 
-    setState(() {
-      _allResponses.add(currentResponse);
-      _responseCount++;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Response #$_responseCount submitted successfully!'),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 2),
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('Saving response...'),
+          ],
+        ),
       ),
     );
 
-    // Clear fields for next response
-    _clearFields();
+    // Submit response to database
+    final responseId = await _responseController.submitResponse(
+      formId: widget.formId,
+      userId: widget.userId,
+      answersData: answersData,
+    );
+
+    Navigator.pop(context); // Close loading dialog
+
+    if (responseId != null && responseId > 0) {
+      setState(() {
+        _responseCount++;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Response #$_responseCount submitted successfully!'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // Clear fields for next response
+      _clearFields();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to save response'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   void _viewAllResponses() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('All Responses ($_responseCount)'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: _allResponses.isEmpty
-              ? Text('No responses submitted yet.')
-              : ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _allResponses.length,
-                  itemBuilder: (context, index) {
-                    return Card(
-                      margin: EdgeInsets.only(bottom: 8),
-                      child: ExpansionTile(
-                        title: Text('Response #${index + 1}'),
-                        children: [
-                          Padding(
-                            padding: EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: _allResponses[index].entries.map((entry) {
-                                return Padding(
-                                  padding: EdgeInsets.only(bottom: 8),
-                                  child: Text(
-                                    '${entry.key}: ${entry.value}',
-                                    style: TextStyle(fontSize: 14),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Close'),
-          ),
-        ],
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$_responseCount responses saved to database'),
+        duration: Duration(seconds: 2),
       ),
     );
   }
 
   Widget _buildFillableField(int index) {
-    final question = widget.form.questions[index];
+    final question = _questions[index];
+    final choices = _questionChoices[index];
 
-    switch (question.type) {
-      case QuestionType.text:
+    switch (question.questionType) {
+      case 'text':
         return TextFormField(
           controller: _textControllers[index],
           decoration: InputDecoration(
-            labelText: question.question,
+            labelText: question.questionText,
             border: OutlineInputBorder(),
           ),
         );
 
-      case QuestionType.checkbox:
+      case 'checkbox':
         return Row(
           children: [
             Expanded(
               child: Text(
-                question.question,
+                question.questionText,
                 style: TextStyle(fontSize: 16),
               ),
             ),
@@ -191,19 +250,19 @@ class ResponseCollectionScreenState extends State<ResponseCollectionScreen> {
           ],
         );
 
-      case QuestionType.multipleChoice:
+      case 'multipleChoice':
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              question.question,
+              question.questionText,
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
             ),
             SizedBox(height: 8),
-            ...question.options.map((option) {
+            ...choices.map((choice) {
               return RadioListTile<String>(
-                title: Text(option),
-                value: option,
+                title: Text(choice.choiceText ?? ''),
+                value: choice.choiceText ?? '',
                 groupValue: _selectedMultipleChoice[index],
                 onChanged: (val) {
                   setState(() {
@@ -215,26 +274,27 @@ class ResponseCollectionScreenState extends State<ResponseCollectionScreen> {
           ],
         );
 
-      case QuestionType.dropdown:
+      case 'dropdown':
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              question.question,
+              question.questionText,
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
             ),
             SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: _selectedDropdown[index],
+              initialValue: _selectedDropdown[index],
               decoration: InputDecoration(
                 border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
               hint: Text('Select an option'),
-              items: question.options
-                  .map((opt) => DropdownMenuItem(
-                        value: opt,
-                        child: Text(opt),
+              items: choices
+                  .map((choice) => DropdownMenuItem(
+                        value: choice.choiceText,
+                        child: Text(choice.choiceText ?? ''),
                       ))
                   .toList(),
               onChanged: (val) {
@@ -247,12 +307,23 @@ class ResponseCollectionScreenState extends State<ResponseCollectionScreen> {
         );
 
       default:
-        return SizedBox.shrink();
+        return Text('Unknown question type');
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text('Collect Responses'),
+        ),
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Collect Responses'),
@@ -260,10 +331,10 @@ class ResponseCollectionScreenState extends State<ResponseCollectionScreen> {
           IconButton(
             icon: Badge(
               label: Text('$_responseCount'),
-              child: Icon(Icons.list_alt),
+              child: Icon(Icons.check_circle),
             ),
             onPressed: _viewAllResponses,
-            tooltip: 'View all responses',
+            tooltip: 'View response count',
           ),
         ],
       ),
@@ -278,7 +349,7 @@ class ResponseCollectionScreenState extends State<ResponseCollectionScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      widget.form.projectName,
+                      'Form #${widget.formId}',
                       style: GoogleFonts.jetBrainsMono(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -292,9 +363,16 @@ class ResponseCollectionScreenState extends State<ResponseCollectionScreen> {
                 ],
               ),
               SizedBox(height: 8),
+              Text(
+                '${_questions.length} Questions',
+                style: GoogleFonts.jetBrainsMono(
+                  fontSize: 14,
+                  color: Colors.grey,
+                ),
+              ),
               Divider(thickness: 2),
               SizedBox(height: 16),
-              ...widget.form.questions.asMap().entries.map((entry) {
+              ..._questions.asMap().entries.map((entry) {
                 int index = entry.key;
                 return Card(
                   margin: EdgeInsets.only(bottom: 16.0),
@@ -324,7 +402,8 @@ class ResponseCollectionScreenState extends State<ResponseCollectionScreen> {
                   ElevatedButton(
                     onPressed: _clearFields,
                     style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+                      padding:
+                          EdgeInsets.symmetric(vertical: 16, horizontal: 24),
                     ),
                     child: Icon(Icons.refresh),
                   ),
